@@ -1,48 +1,165 @@
+import React, {Component} from 'react';
 import './App.css';
-import Web3 from 'web3';
 import 'bootstrap/dist/css/bootstrap.min.css';
-import abi from './safekeepabi.js';
-import {useEffect, useState} from 'react';
+import safeKeepAbi from './safekeepabi.json';
+import sfkpABI from './SFKP.json';
+import getWeb3 from './getWeb3';
+import Modal from 'react-modal';
+
 
 
 import { Navbar, Container, Col, Row, Card, Button  } from 'react-bootstrap';
+Modal.setAppElement('#root');
+class App extends Component {
 
-function App() {
-  const [account, setAccount] = useState('');
-  const [accounts, setAccounts] = useState([]);
-  const [depositAmount, setDepositAmount] = useState([]);
-  const [backupAddress, setBackupAdress] = useState([]);
+  constructor(props){
+    super(props)
+    this.state={
+      web3: null,
+      account: null,
+      safeKeepInstance: null,
+      ethDepo: false,
+      ethWithdraw: false,
+      ethDepoAmount:null,
+      ethWithdrawAmount: null,
+      backUpAddress: null,
+      ethBalance: " ",
+      regStatus: false,
+      lastPing: "",
+      daiDepo: false,
+      daiWithdraw: false,
+      daiDepoAmount: null,
+      daiWithdrawAmount: null
+    }
 
-
- const [show,setShow] = useState(false);
- const [display, setdisplay] = useState(false);
-
-
- const checkAccount = async () => {
-    const account = await window.web3.eth.getAccounts();
-    setAccounts(account);
-  };
- const loadFromChain = async () => {
-      const Web3 = require('web3');
-      const web3 = new Web3 ('http://localhost:8545');
-
-      const network = await window.web3.eth.net.getNetworkType();
-      const contractAddress = '0xa055dFC2190bA3C147D96C69eD5e11442A59525f';
-      window.safeKeepContract = new window.web3.eth.Contract(
-      abi,
-      contractAddress
-    );
-
-
-    const result = await window.safeKeepContract.methods.getData().call(console.log('result'))
- }
-useEffect(() => {
-loadFromChain()
-
-},[accounts])
-
-
+    this.handleUserInput = this.handleUserInput.bind(this)
     
+  }
+  
+  componentDidMount = async () => {
+    try {
+      // Get network provider and web3 instance.
+      const web3 = await getWeb3();
+     this.setState({
+        web3
+      })
+
+      // Use web3 to get the user's accounts.
+      const accounts = await web3.eth.getAccounts();
+      const account = accounts[0];
+      this.setState({
+        account
+      })
+
+      //Instantiate SafeKeep Contract
+      const safeKeepAddress = "0xa055dFC2190bA3C147D96C69eD5e11442A59525f";
+      const safeKeepInstance = new web3.eth.Contract(safeKeepAbi, safeKeepAddress);
+      this.setState({
+        safeKeepInstance
+      })
+      console.log(this.state.safeKeepInstance, 'safeKeep Instance')
+
+
+      //Load Ether balannce upon opening the app
+      const ethBalance = await this.state.safeKeepInstance.methods.getBalance().call();
+      this.setState({
+        ethBalance
+      })
+
+      //get last Ping
+     
+     
+
+
+      //automatically register address
+   /*   alert("Let's get you registered")
+      const regRes = await this.state.safeKeepInstance.methods.isUser(this.state.account).send({from: this.state.account});
+      console.log(regRes, 'regsitration result')
+      console.log(regRes.status, 'registration status')
+      alert("you can now go ahead to deposit your funds!")
+*/
+
+
+
+      
+
+      
+    } catch (error) {
+      // Catch any errors for any of the above operations.
+      alert(
+        `Failed to load web3, accounts, or contract. Check console for details.`,
+      );
+      console.error(error);
+    }
+  };
+
+
+
+
+//function to deposit ether
+  depositEther = async (e)=> {
+    console.log(this.state.ethDepoAmount, this.state.backUpAddress)
+    console.log(this.state.safeKeepInstance, 'yes?')
+    e.preventDefault();
+    const amount= this.state.web3.utils.toWei(this.state.ethDepoAmount, 'ether')
+    await this.state.safeKeepInstance.methods.depositEther(this.state.backUpAddress).send({
+      from: this.state.account,
+      value: amount
+    })
+
+    alert("You have successfully deposited " + this.state.ethDepoAmount);
+  }
+
+
+//function to check ether balance
+
+withdrawEther = async(e)=> {
+  e.preventDefault();
+  console.log(this.state.safeKeepInstance, 'for withdraw')
+  await this.state.safeKeepInstance.methods.withdraw(this.state.ethWithdrawAmount).send({
+    from: this.state.account
+  })
+
+  alert("withdraw successful")
+}
+
+//function to PING
+
+pingHandler = async(e)=> {
+ const pingRes = await this.state.safeKeepInstance.methods.ping().send({
+    from: this.state.account
+  })
+
+  console.log(pingRes, 'ping result')
+
+ 
+}
+
+getPing = async(e)=> {
+   await this.state.safeKeepInstance.methods.getLastPing().call({
+    from: this.state.account
+  })
+     
+}
+
+
+
+
+
+
+
+
+
+  handleUserInput(e){
+    this.setState({
+      [e.target.name]: e.target.value
+    });
+  }
+
+
+  render(){
+
+  
   return (
   <div className="App">
       <Navbar bg="dark" variant="dark" className="rounded-top">
@@ -57,14 +174,15 @@ loadFromChain()
       Dashboard  
     </Navbar.Brand>
    
-         <span className="navbar-text flex-end  ">{account}</span>
+         <span className="navbar-text flex-end  ">{this.state.account}</span>
     
   </Navbar>
 
   <Container className="pt-5">
     <h6 className="mb-n4"> Hide Balance less than eth </h6> 
      <input type="checkbox" className="margin"></input>
-     <div border="dark "  className= "box position pad " style={{ width: '6rem', height: '2.5rem'}} >Admin</div>
+     <button border="dark "  className= "box position pad " style={{ width: '6rem', height: '2.5rem'}} 
+     onClick={this.getPing}>Admin</button>
   </Container>
   
 <Container className="pt-5 pb-4">
@@ -76,7 +194,7 @@ loadFromChain()
     <Row>
       <Col sm={7}>
         <h4 className="pt-4 ">ETH Balance</h4>
-      <h4>0.001ETH</h4>
+      <h4>{this.state.ethBalance}ETH</h4>
        </Col>
        <Col sm={5}>
            <h4 className="pt-4 ">$1234.00</h4>
@@ -84,27 +202,35 @@ loadFromChain()
        </Col>
     </Row>
     <div className="pt-3 mt-2">
-   <Button variant="outline-dark" style={{ width: '8rem'} } className=" mx-4" onClick={() =>setShow(true)} >Deposit</Button>{' '}
-      <Button variant="outline-dark" style={{ width: '8rem'}} onClick={() =>setdisplay(true)}>Withdraw</Button>
+   <Button variant="outline-dark" style={{ width: '8rem'} } className=" mx-4" 
+   onClick={()=> {this.setState({ethDepo: true})}}>Deposit</Button>{' '}
+      <Button variant="outline-dark" style={{ width: '8rem'}} 
+       onClick={()=> {this.setState({ethWithdraw: true})}}>Withdraw</Button>
      </div>  
     </Card.Body>
   </Card>
 
   <br/>
 <>{
-   show?<Card border="dark" style={{ width: '30rem', height: '13rem',top:'2' } } ClassName='mb-5'>
-          <div class="">
+  //POP UP MODAL TO DEPOSIT ETHER
+  <Modal isOpen={this.state.ethDepo}
+  onRequestClose={()=>{this.setState({ethDepo: false})}} className="modal-popup">
+   <Card border="dark" style={{ width: '30rem', height: '13rem',top:'2' } } ClassName='mb-5'>
+          <div class="form-card">
             <h4 class="text-center mb-4 mt-3">DEPOSIT</h4>
-            <form class="form-inline">
+            <form class="form-inline" onSubmit={this.depositEther}>
               <div class="form-group mx-sm-3 mb-2">
                 <label htmlFor="deposit" class="sr-only">
                   ETH
                 </label>
                 <input
-                  type="text"
+                  type="number"
                   class="form-control"
                   id="deposit"
                   placeholder="Amount in ETH"
+                  name= "ethDepoAmount"
+                  value={this.state.ethDepoAmount}
+                  onChange= {this.handleUserInput}
                  
                 />
               </div>
@@ -117,6 +243,9 @@ loadFromChain()
                   class="form-control"
                   id="address"
                   placeholder="Backup Address"
+                  name= "backUpAddress"
+                  value={this.state.backUpAddress}
+                  onChange= {this.handleUserInput}
                 
                 />
               </div>
@@ -126,7 +255,7 @@ loadFromChain()
                 type="submit"
                
                 className="btn btn-primary ml-5"
-                onClick={() =>setShow(false)}
+                
               >
                 Deposit
               </button>
@@ -134,40 +263,54 @@ loadFromChain()
             </form>
           </div>
          
-        </Card>  :null
+        </Card> 
+      </Modal>
+      //END OF POP UP MODAL TO DEPOSIT ETHER
+
        
 }
 </>
 
 {
-   
-   display?
-   <Card border="dark" style={{ width: '30rem', height: '6rem', display:'flex'} }>
-  
-   <div class="col border-left">
-            <h4 className="px-2 pt-2">Withdrawal</h4>
-            <form class="form-inline">
+  // POP UP MODAL TO WITHDRAW ETH
+  <Modal isOpen={this.state.ethWithdraw}
+  onRequestClose={()=>{this.setState({ethWithdraw: false})}} className="modal-popup"> 
+ <Card border="dark" style={{ width: '30rem', height: '13rem',top:'2' } } ClassName='mb-5'>
+          <div class="form-card">
+            <h4 class="text-center mb-4 mt-3">Withdraw</h4>
+            <form class="form-inline" onSubmit={this.withdrawEther}>
               <div class="form-group mx-sm-3 mb-2">
-                <label htmlFor="withdraw" class="sr-only">
-                  withdraw
+                <label htmlFor="deposit" class="sr-only">
+                  ETH
                 </label>
                 <input
-                  type="text"
+                  type="number"
                   class="form-control"
-                  id="withdraw"
-                  placeholder="ETH"
-                /> 
+                  id="deposit"
+                  placeholder="Amount in ETH"
+                  name= "ethWithdrawAmount"
+                  value={this.state.ethWithdrawAmount}
+                  onChange= {this.handleUserInput}
+                 
+                />
               </div>
+              <div className="center">
               <button
+              
                 type="submit"
+               
+                className="btn btn-primary ml-5"
                 
-                class="btn btn-primary mb-2"
-                 onClick={() =>setdisplay(false)}
               >
                 Withdraw
               </button>
+              </div>
             </form>
-          </div> </Card>:null
+          </div>
+         
+        </Card> 
+          </Modal>
+        //END OF POPUP MODAL TO WITHDRAW ETH
 
 }
 <Card border="dark" style={{ width: '30rem', height: '13rem'} }>
@@ -205,14 +348,121 @@ loadFromChain()
        </Col>
     </Row>
     <div className="pt-3 mt-2">
-      <Button variant="outline-dark" style={{ width: '8rem'} } className=" mx-4" >Deposit</Button>{' '}
-      <Button variant="outline-dark" style={{ width: '8rem'} }>Withdraw</Button>
+      <Button variant="outline-dark" style={{ width: '8rem'} } className=" mx-4" 
+      onClick={()=> {this.setState({daiDepo: true})}}>Deposit</Button>{' '}
+      <Button variant="outline-dark" style={{ width: '8rem'} }
+      onClick={()=> {this.setState({daiDepo: true})}}>Withdraw</Button>
      </div>
       
         
     </Card.Body>
   </Card>
 <div/>
+
+<>{
+  //POP UP MODAL TO DEPOSIT DAI
+  <Modal isOpen={this.state.daiDepo}
+  onRequestClose={()=>{this.setState({daiDepo: false})}} className="modal-popup">
+   <Card border="dark" style={{ width: '30rem', height: '13rem',top:'2' } } ClassName='mb-5'>
+          <div class="form-card">
+            <h4 class="text-center mb-4 mt-3">DEPOSIT DAI</h4>
+            <form class="form-inline" onSubmit={this.depositEther}>
+              <div class="form-group mx-sm-3 mb-2">
+                <label htmlFor="deposit" class="sr-only">
+                  DAI
+                </label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="deposit"
+                  placeholder="Amount in DAI"
+                  name= "daiDepoAmount"
+                  value={this.state.daiDepoAmount}
+                  onChange= {this.handleUserInput}
+                 
+                />
+              </div>
+              <div class="form-group mx-sm-3 mb-2">
+                <label htmlFor="address" class="sr-only">
+                  DAI
+                </label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="address"
+                  placeholder="Backup Address"
+                  name= "backUpAddress"
+                  value={this.state.backUpAddress}
+                  onChange= {this.handleUserInput}
+                
+                />
+              </div>
+              <div className="center">
+              <button
+              
+                type="submit"
+               
+                className="btn btn-primary ml-5"
+                
+              >
+                Deposit
+              </button>
+              </div>
+            </form>
+          </div>
+         
+        </Card> 
+      </Modal>
+      //END OF POP UP MODAL TO DEPOSIT DAI
+
+       
+}
+</>
+
+{
+  // POP UP MODAL TO WITHDRAW DAI
+  <Modal isOpen={this.state.daiWithdraw}
+  onRequestClose={()=>{this.setState({daiWithdraw: false})}} className="modal-popup"> 
+ <Card border="dark" style={{ width: '30rem', height: '13rem',top:'2' } } ClassName='mb-5'>
+          <div class="form-card">
+            <h4 class="text-center mb-4 mt-3">Withdraw DAI</h4>
+            <form class="form-inline" onSubmit={this.withdrawEther}>
+              <div class="form-group mx-sm-3 mb-2">
+                <label htmlFor="deposit" class="sr-only">
+                  DAI
+                </label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="deposit"
+                  placeholder="Amount in DAI"
+                  name= "daiWithdrawAmount"
+                  value={this.state.daiWithdrawAmount}
+                  onChange= {this.handleUserInput}
+                 
+                />
+              </div>
+              <div className="center">
+              <button
+              
+                type="submit"
+               
+                className="btn btn-primary ml-5"
+                
+              >
+                Withdraw
+              </button>
+              </div>
+            </form>
+          </div>
+         
+        </Card> 
+          </Modal>
+        //END OF POPUP MODAL TO WITHDRAW DAI
+
+}
+
+
   <br />
  </div>
  </Col>  
@@ -248,10 +498,11 @@ loadFromChain()
          <Card.Body>
          <div className="pt-5">
            <h4 className="head">Ping Countdown</h4>
-           <h4 className="head pt-2">00:22:34</h4>
+           <h4 className="head pt-2">{this.state.lastPing}</h4>
           </div>
           <div>
-            <div border="dark pt-4"  className= "box position " style={{ width: '6rem', height: '2.5rem' }} >Ping</div>
+            <button border="dark pt-4"  className= "box position " style={{ width: '6rem', height: '2.5rem' }}
+            onClick={this.pingHandler} >Ping</button>
           </div>
           <br />
          </Card.Body>
@@ -273,6 +524,7 @@ loadFromChain()
 
 </div> 
  );
+}
 }
 
 export default App;
